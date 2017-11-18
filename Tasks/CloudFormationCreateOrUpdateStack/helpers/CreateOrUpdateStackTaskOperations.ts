@@ -130,6 +130,7 @@ export class TaskOperations {
             request.NotificationARNs = this.getNotificationArns(taskParameters.notificationARNs);
             request.ResourceTypes = this.getResourceTypes(taskParameters.resourceTypes);
             request.Capabilities = this.getCapabilities(taskParameters.capabilityIAM, taskParameters.capabilityNamedIAM);
+            request.Tags = this.getTags(taskParameters.tags);
 
             try {
                 const response: CloudFormation.CreateStackOutput = await this.cloudFormationClient.createStack(request).promise();
@@ -185,9 +186,9 @@ export class TaskOperations {
     }
 
     private static async createOrUpdateWithChangeSet(taskParameters: Parameters.TaskParameters,
-                                                     changesetType: string,
-                                                     templateBody: string,
-                                                     templateParameters: CloudFormation.Parameters) : Promise<string> {
+        changesetType: string,
+        templateBody: string,
+        templateParameters: CloudFormation.Parameters) : Promise<string> {
 
         const changeSetExists = await this.testChangeSetExists(taskParameters.changeSetName, taskParameters.stackName);
         if (changeSetExists) {
@@ -271,7 +272,29 @@ export class TaskOperations {
         return (arr && arr.length > 0) ? arr : null;
     }
 
-    private static getNotificationArns(notificationARNs: string []) {
+    private static getTags(tagsString: string) {
+
+        const arr: CloudFormation.Tags = [];
+
+        if (tagsString) {
+            console.log(tl.loc('AddingTags', tagsString));
+            var tags = tagsString.split(' ');
+
+            while (tags.length > 0) {
+                var keyValue = tags.shift().split(',');
+                if (keyValue.length > 1) {
+                    const Key = keyValue[0];
+                    const Value = keyValue[1];
+                    if (Key && Value)
+                        arr.push({ Key, Value });
+                }
+            }
+        }
+
+        return (arr && arr.length > 0) ? arr : null;
+    }
+
+    private static getNotificationArns(notificationARNs: string[]) {
         // Supplying an empty array is different (to the service) than a null
         // array. When splitting our task parameters, we get an empty array.
         if (notificationARNs && notificationARNs.length > 0) {
@@ -332,7 +355,7 @@ export class TaskOperations {
                 tl.warning(tl.loc('NoWorkToDo'));
                 return true;
             }
-        // tslint:disable-next-line:no-empty
+            // tslint:disable-next-line:no-empty
         } catch (err) {
         }
 
@@ -363,7 +386,7 @@ export class TaskOperations {
         console.log(tl.loc('WaitingForChangeSetValidation', changeSetName, stackName));
         try {
             const response = await this.cloudFormationClient.waitFor('changeSetCreateComplete',
-                                                    { ChangeSetName: changeSetName, StackName: stackName }).promise();
+                { ChangeSetName: changeSetName, StackName: stackName }).promise();
             console.log(tl.loc('ChangeSetValidated'));
         } catch (err) {
             // Inspect to see if the error was down to the service reporting (as an exception trapped
